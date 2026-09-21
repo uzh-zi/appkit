@@ -111,12 +111,12 @@ class AzureOpenAIError(AppkitError):
             text += f" ({detail})"
         if self.request_id:
             text += f" [request-id: {self.request_id}]"
-        if hint := _aoai_hint(self.status, self.code):
+        if hint := _aoai_hint(self.status, self.code, self.url, self.message):
             text += f"\n{hint}"
         return text
 
 
-def _aoai_hint(status: int, code: str = "") -> str:
+def _aoai_hint(status: int, code: str = "", url: str = "", message: str = "") -> str:
     if code == "SubscriptionNotRegistered":
         return (
             "Hint: the subscription the caller is scoped to has not registered the "
@@ -125,16 +125,30 @@ def _aoai_hint(status: int, code: str = "") -> str:
             "or point the identity at the subscription that owns the resource."
         )
     if status in (401, 403):
+        # A resource behind a VNet or firewall rejects an outside caller with a
+        # 403 that has nothing to do with RBAC. Pointing at the role assignment
+        # there sends people to re-grant a role they already have.
+        if "virtual network" in message.lower() or "firewall" in message.lower():
+            return (
+                "Hint: this is a network restriction, not a missing role. The "
+                "Azure OpenAI resource only accepts callers from an allowed "
+                "VNet or IP range, so a developer machine needs the VPN or an "
+                "allowlist entry; a deployed app needs to egress from the "
+                "allowed network."
+            )
         return (
             "Hint: the app's managed identity is probably missing the 'Cognitive "
             "Services OpenAI User' role on the Azure OpenAI resource, or the token "
             "was issued for the wrong audience."
         )
     if status == 404:
+        setting = "APPKIT_CHAT" if "/chat/completions" in url else "APPKIT_EMBEDDINGS"
         return (
-            "Hint: check APPKIT_EMBEDDINGS_ENDPOINT and "
-            "APPKIT_EMBEDDINGS_DEPLOYMENT. Azure OpenAI resolves a model by its "
-            "*deployment* name, which need not match the model name."
+            f"Hint: check {setting}_ENDPOINT and "
+            f"{setting}_DEPLOYMENT. Azure OpenAI resolves a model by its "
+            "*deployment* name, which need not match the model name. A model "
+            "newer than the pinned API version can also 404 here -- try "
+            f"{setting}_API_VERSION before assuming the name is wrong."
         )
     if status == 429:
         return "Hint: the deployment is rate-limited; appkit already retried."

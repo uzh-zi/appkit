@@ -174,3 +174,44 @@ def test_chat_and_embeddings_endpoints_are_independent(azure_backend, monkeypatc
 def test_a_trailing_slash_is_harmless(azure_backend, monkeypatch):
     monkeypatch.setenv("APPKIT_CHAT_ENDPOINT", ENDPOINT + "/")
     assert chat.available() is True
+
+
+@respx.mock
+def test_unknown_deployment_points_at_the_chat_settings(azure_backend, aoai_env):
+    """The 404 hint must name APPKIT_CHAT_*, not the embeddings settings."""
+    respx.post(URL).mock(
+        return_value=httpx.Response(
+            404, json={"error": {"code": "DeploymentNotFound", "message": "no such deployment"}}
+        )
+    )
+
+    with pytest.raises(AzureOpenAIError) as caught:
+        chat.complete("x")
+
+    assert "APPKIT_CHAT_DEPLOYMENT" in str(caught.value)
+    assert "APPKIT_EMBEDDINGS" not in str(caught.value)
+
+
+@respx.mock
+def test_a_firewall_rejection_is_not_reported_as_a_missing_role(azure_backend, aoai_env):
+    """A VNet-restricted resource 403s an outside caller who holds the role.
+
+    Blaming RBAC there sends people to re-grant a role they already have.
+    """
+    respx.post(URL).mock(
+        return_value=httpx.Response(
+            403,
+            json={
+                "error": {
+                    "code": "AccessDenied",
+                    "message": "Access denied due to Virtual Network/Firewall rules.",
+                }
+            },
+        )
+    )
+
+    with pytest.raises(AzureOpenAIError) as caught:
+        chat.complete("x")
+
+    assert "network restriction" in str(caught.value)
+    assert "Cognitive Services OpenAI User" not in str(caught.value)
