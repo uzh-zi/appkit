@@ -220,6 +220,36 @@ faking. There, no endpoint is a deployment mistake, and handing back meaningless
 vectors would surface later as poor relevance — much harder to trace than a
 raise.
 
+### `appkit.chat`
+
+```python
+if chat.available():
+    query = chat.complete(f"Rewrite this demand as a search query: {demand_text}")
+else:
+    query = demand_text
+```
+
+A single-turn text completion, for the same job embeddings are usually paired
+with: turning a short or jargon-heavy demand into fuller text before embedding
+and searching it. No conversation history, no streaming, no function calling —
+just a prompt in, a reply out.
+
+It follows `appkit.embeddings`' shape exactly: `APPKIT_CHAT_ENDPOINT` is the
+switch, independent of both `APPKIT_BACKEND` and
+`APPKIT_EMBEDDINGS_ENDPOINT` (an environment can serve the two off different
+resources), the identity needs the same **Cognitive Services OpenAI User**
+role, and either spelling of the endpoint (resource root or full deployment
+URL) is accepted.
+
+The one difference from embeddings: there is no meaningful "meaningless but
+deterministic" stand-in for generated text, so on the fake backend — or on
+`azure` with no endpoint configured — `complete()` returns the prompt
+unchanged rather than inventing one. That is exactly what an app doing query
+expansion wants when expansion is unavailable: search on the original text,
+not on nothing. As with embeddings, a missing endpoint on the `azure` backend
+still raises rather than silently falling back — there, it is a deployment
+mistake.
+
 ### `appkit.db`
 
 ```python
@@ -290,8 +320,8 @@ network in front of the app. It needs the `appkit[verify]` extra, Easy Auth's
 
 ## Configuration
 
-Only `APPKIT_SHAREPOINT_FAKE_DIR` and `APPKIT_EMBEDDINGS_ENDPOINT` apply to the
-fake backend; the rest are
+Only `APPKIT_SHAREPOINT_FAKE_DIR`, `APPKIT_EMBEDDINGS_ENDPOINT`, and
+`APPKIT_CHAT_ENDPOINT` apply to the fake backend; the rest are
 needed in `azure` mode:
 
 | Variable | Used by | Meaning |
@@ -303,6 +333,9 @@ needed in `azure` mode:
 | `APPKIT_EMBEDDINGS_ENDPOINT` | embeddings | Azure OpenAI resource endpoint, e.g. `https://x.openai.azure.com`. Setting it turns embeddings on, on either backend. |
 | `APPKIT_EMBEDDINGS_DEPLOYMENT` | embeddings | Deployment name (default `text-embedding-3-small`). |
 | `APPKIT_EMBEDDINGS_API_VERSION` | embeddings | REST API version (default `2023-05-15`). |
+| `APPKIT_CHAT_ENDPOINT` | chat | Azure OpenAI resource endpoint. Setting it turns chat on, on either backend, independently of `APPKIT_EMBEDDINGS_ENDPOINT`. |
+| `APPKIT_CHAT_DEPLOYMENT` | chat | Deployment name (default `gpt-4o-mini`). |
+| `APPKIT_CHAT_API_VERSION` | chat | REST API version (default `2023-05-15`). |
 | `APPKIT_DIRECTORY_TOP` | directory | Graph page size (default 200). |
 | `APPKIT_DIRECTORY_EMPLOYEE_FILTER` | directory | Optional OData fragment applied when `employees_only=True`; without it the filtering happens in Python. |
 | `APPKIT_DNS_SERVER` | dns | Resolver to query. Defaults to the system resolver. |

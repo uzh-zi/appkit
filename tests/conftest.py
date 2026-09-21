@@ -20,6 +20,9 @@ def fake_backend(request, monkeypatch):
     # Azure OpenAI for real -- slow, billed and non-deterministic. Tests that
     # want a live endpoint set it themselves.
     monkeypatch.delenv("APPKIT_EMBEDDINGS_ENDPOINT", raising=False)
+    # Same reasoning as the embeddings endpoint: a developer's exported chat
+    # endpoint must not make this suite call Azure OpenAI for real.
+    monkeypatch.delenv("APPKIT_CHAT_ENDPOINT", raising=False)
     import appkit
 
     appkit.reset_fakes()

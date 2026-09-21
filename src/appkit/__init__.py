@@ -10,6 +10,7 @@ tests:
 * :mod:`appkit.auth`        – the signed-in :class:`~appkit.auth.User`
                               from Container Apps Easy Auth headers
 * :mod:`appkit.embeddings`  – text embeddings (Azure OpenAI)
+* :mod:`appkit.chat`        – single-turn text completion (Azure OpenAI)
 
 Application code imports these modules. It must **never** import ``httpx`` or
 ``psycopg`` directly – appkit owns those integrations.
@@ -20,13 +21,14 @@ The active backend is chosen by ``APPKIT_BACKEND`` (``fake`` by default,
 
 from __future__ import annotations
 
-from . import auth, config, db, directory, dns, embeddings, errors, mail, sharepoint
+from . import auth, chat, config, db, directory, dns, embeddings, errors, mail, sharepoint
 from .auth import User, user
 from .config import backend, is_fake
 from .errors import AppkitError, AzureOpenAIError, ConfigError, GraphError
 
 __all__ = [
     "auth",
+    "chat",
     "config",
     "db",
     "directory",

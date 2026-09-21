@@ -415,6 +415,7 @@ _INTEGRATIONS = (
     ("mail", "APPKIT_MAIL_SENDER", "send mail"),
     ("database", "APPKIT_DB_DSN", "query Postgres"),
     ("embeddings", "APPKIT_EMBEDDINGS_ENDPOINT", "embed text"),
+    ("chat", "APPKIT_CHAT_ENDPOINT", "complete chat prompts"),
 )
 
 #: Settings whose value must never be printed. A DSN carries a host *and*
