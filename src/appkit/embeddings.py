@@ -103,6 +103,26 @@ def _deployment_from_endpoint() -> str:
     return tail.split("/")[0] if tail else ""
 
 
+def deployment(override: str | None = None) -> str:
+    """The embedding deployment :func:`embed` would use.
+
+    Exposed because a caller that *stores* vectors has to record which model
+    produced them: vectors from two different deployments are not comparable,
+    so a cache that cannot name its deployment cannot tell a stale entry from
+    a fresh one.
+    """
+    return _resolve_deployment(override)
+
+
+def _resolve_deployment(override: str | None = None) -> str:
+    return (
+        override
+        or os.getenv("APPKIT_EMBEDDINGS_DEPLOYMENT", "").strip()
+        or _deployment_from_endpoint()
+        or DEFAULT_DEPLOYMENT
+    )
+
+
 def embed(texts: list[str], *, deployment: str | None = None) -> list[list[float]]:
     """Return one vector per input string, in the order given.
 
@@ -132,12 +152,7 @@ def embed(texts: list[str], *, deployment: str | None = None) -> list[list[float
         # later as poor relevance, which is far harder to trace than a raise.
         env("APPKIT_EMBEDDINGS_ENDPOINT", required=True)
 
-    deployment = (
-        deployment
-        or os.getenv("APPKIT_EMBEDDINGS_DEPLOYMENT", "").strip()
-        or _deployment_from_endpoint()
-        or DEFAULT_DEPLOYMENT
-    )
+    deployment = _resolve_deployment(deployment)
     return _embed_via_azure(texts, endpoint=endpoint, deployment=deployment)
 
 

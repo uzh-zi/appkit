@@ -308,3 +308,25 @@ def test_a_gateway_base_path_is_left_alone(azure_backend, monkeypatch):
 def test_a_trailing_slash_is_harmless(azure_backend, monkeypatch):
     monkeypatch.setenv("APPKIT_EMBEDDINGS_ENDPOINT", ENDPOINT + "/")
     assert embeddings.available() is True
+
+
+def test_deployment_reports_the_default(fake_backend, monkeypatch):
+    """A caller storing vectors can name the model without guessing."""
+    monkeypatch.delenv("APPKIT_EMBEDDINGS_DEPLOYMENT", raising=False)
+    monkeypatch.delenv("APPKIT_EMBEDDINGS_ENDPOINT", raising=False)
+
+    assert embeddings.deployment() == embeddings.DEFAULT_DEPLOYMENT
+
+
+def test_deployment_follows_the_same_precedence_as_embed(fake_backend, monkeypatch):
+    monkeypatch.setenv(
+        "APPKIT_EMBEDDINGS_ENDPOINT",
+        "https://x.openai.azure.com/openai/deployments/from-url",
+    )
+    monkeypatch.delenv("APPKIT_EMBEDDINGS_DEPLOYMENT", raising=False)
+    assert embeddings.deployment() == "from-url"
+
+    monkeypatch.setenv("APPKIT_EMBEDDINGS_DEPLOYMENT", "from-env")
+    assert embeddings.deployment() == "from-env"
+
+    assert embeddings.deployment("explicit") == "explicit"
