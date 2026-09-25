@@ -5,8 +5,9 @@ business app (and the AI assistant writing it) never has to touch Microsoft
 Graph, `httpx`, or `psycopg` by hand.
 
 Every module authenticates with the app's **managed identity** in production
-and ships with an **in-memory fake** for local development and tests. No
-secrets, no connection strings in code, no network in the test suite.
+(Graph can use an app registration instead, see below) and ships with an
+**in-memory fake** for local development and tests. No secrets, no connection
+strings in code, no network in the test suite.
 
 ```python
 from appkit import sharepoint, mail, auth, db, directory
@@ -345,12 +346,25 @@ needed in `azure` mode:
 | `APPKIT_AUTH` | auth | `easyauth`, `verify`, `public` or `dev`. Required on an Azure app platform. |
 | `APPKIT_AUTH_TENANT_ID` / `APPKIT_AUTH_CLIENT_ID` / `APPKIT_AUTH_AUTHORITY` | auth | Only for `APPKIT_AUTH=verify`. |
 | `APPKIT_DEV_USER` / `APPKIT_DEV_EMAIL` / `APPKIT_DEV_ROLES` / `APPKIT_DEV_SHORTNAME` | auth | The local dev user (`APPKIT_AUTH=dev` only). |
+| `APPKIT_GRAPH_CLIENT_ID` / `APPKIT_GRAPH_CLIENT_SECRET` / `APPKIT_GRAPH_TENANT_ID` | sharepoint, mail, directory | Sign in to Graph as this app registration instead of the managed identity. All three or none; the secret comes from Key Vault, never from code. |
 | `APPKIT_DIRECTORY_PROBE` / `APPKIT_DNS_PROBE` | doctor | A name fragment and a hostname the doctor should look up. Both checks skip unless set, so nothing reaches the network unasked. |
 
 The managed identity needs, at minimum: Graph `Sites.Read.All` (SharePoint),
 `Mail.Send` (mail), `User.Read.All` (directory), an AAD role on the Postgres
 server (db), and **Cognitive Services OpenAI User** on the Azure OpenAI
 resource (embeddings).
+
+**Graph as an app registration.** At UZH the Entra team grants Graph
+application permissions such as `Sites.Selected` to app registrations, not to
+managed identities. Set the three `APPKIT_GRAPH_*` variables and Graph calls
+(SharePoint, mail, directory) sign in as that registration, while Postgres and
+Azure OpenAI stay on the managed identity. It is deliberately not
+`AZURE_CLIENT_SECRET`: that would move the whole process, and the Postgres role
+belongs to the managed identity. The startup report says which one is in use:
+
+```text
+config | graph        PASS  app registration 64398970-… (client secret)
+```
 
 ## Errors
 

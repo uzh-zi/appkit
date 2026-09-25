@@ -4,8 +4,9 @@ This is the *only* place in appkit that imports ``httpx`` and speaks HTTP to
 Graph. Application code must never do this directly – it calls
 :func:`appkit.sharepoint.list_rows` or :func:`appkit.mail.send_mail` instead.
 
-All requests authenticate with the app's managed identity (see
-:mod:`appkit._credential`) and go through :func:`_send`, which:
+All requests authenticate with the app's managed identity, or with an app
+registration when ``APPKIT_GRAPH_*`` names one (see :mod:`appkit._credential`),
+and go through :func:`_send`, which:
 
 * retries throttling and transient server errors with backoff, honouring
   Graph's ``Retry-After`` header;
@@ -25,10 +26,10 @@ from __future__ import annotations
 import time
 from typing import Any
 
+from ._credential import GRAPH_SCOPE
 from .errors import GraphError
 
 GRAPH_BASE = "https://graph.microsoft.com/v1.0"
-GRAPH_SCOPE = "https://graph.microsoft.com/.default"
 _TIMEOUT = 30.0
 
 _MAX_ATTEMPTS = 4
