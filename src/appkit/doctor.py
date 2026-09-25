@@ -219,7 +219,7 @@ def check_credential() -> Check:
     else:
         kind = "token acquired (could not read its claims)"
 
-    source = "APPKIT_GRAPH_CLIENT_SECRET" if app_client_id else capture.name_found
+    source = "ClientSecretCredential" if app_client_id else capture.name_found
     detail = f"{source} -> {kind}" if source else kind
     # These two get mixed up constantly: the site grant takes the client id, the
     # Graph app-role assignment takes the object id.
@@ -501,8 +501,10 @@ def startup_checks() -> list[Check]:
         # Everything below reads the backend, so it would only repeat this.
         return checks
     checks.append(check_auth())
-    if not config.is_fake():
-        checks.append(check_graph_identity())
+    # Reported on the fake backend too: it only reads configuration, and a
+    # deployment parked on fake is exactly where you want to see who Graph
+    # will be once it is switched back.
+    checks.append(check_graph_identity())
     checks.extend(settings_checks())
     return checks
 

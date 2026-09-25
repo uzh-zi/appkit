@@ -108,11 +108,14 @@ def test_startup_fails_loudly_on_a_partial_set(azure, monkeypatch):
     assert "APPKIT_GRAPH_TENANT_ID" in line.detail
 
 
-def test_startup_says_nothing_about_graph_on_the_fake_backend(monkeypatch):
+def test_startup_names_graph_even_on_the_fake_backend(monkeypatch):
+    """A deployment parked on fake should still say who Graph will be on azure."""
     monkeypatch.setenv("APPKIT_BACKEND", "fake")
     monkeypatch.setenv("APPKIT_AUTH", "dev")
+    _set_app(monkeypatch)
 
-    assert not [check for check in doctor.startup_checks() if check.name == "graph"]
+    line = _graph_line(doctor.startup_checks())
+    assert APP["APPKIT_GRAPH_CLIENT_ID"] in line.detail
 
 
 def test_credential_check_points_at_the_secret_when_the_registration_fails(
