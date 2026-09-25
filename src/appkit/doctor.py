@@ -35,6 +35,7 @@ from dataclasses import asdict, dataclass, field
 from typing import Any
 
 from . import config
+from .errors import ConfigError
 
 PASS = "PASS"
 FAIL = "FAIL"
@@ -187,18 +188,25 @@ def check_auth() -> Check:
 
 
 def check_credential() -> Check:
-    from ._credential import token
-    from ._graph import GRAPH_SCOPE
+    from ._credential import GRAPH_SCOPE, graph_app_client_id, token
+
+    try:
+        app_client_id = graph_app_client_id()
+    except ConfigError as exc:
+        return Check("credential", FAIL, str(exc))
 
     try:
         with _CredentialNameCapture() as capture:
             raw = token(GRAPH_SCOPE)
     except Exception as exc:
-        return Check(
-            "credential", FAIL, f"{type(exc).__name__}: {exc}",
-            hint="No managed identity is available. In Azure, check the identity "
-            "is assigned to the app; locally, run `az login`.",
-        )
+        if app_client_id:
+            hint = (f"Graph signs in as app registration {app_client_id}. Check "
+                    "APPKIT_GRAPH_CLIENT_SECRET is current and APPKIT_GRAPH_TENANT_ID "
+                    "is the registration's tenant.")
+        else:
+            hint = ("No managed identity is available. In Azure, check the identity "
+                    "is assigned to the app; locally, run `az login`.")
+        return Check("credential", FAIL, f"{type(exc).__name__}: {exc}", hint=hint)
 
     claims = _token_claims(raw)
     roles = claims.get("roles") or []
@@ -211,7 +219,8 @@ def check_credential() -> Check:
     else:
         kind = "token acquired (could not read its claims)"
 
-    detail = f"{capture.name_found} -> {kind}" if capture.name_found else kind
+    source = "APPKIT_GRAPH_CLIENT_SECRET" if app_client_id else capture.name_found
+    detail = f"{source} -> {kind}" if source else kind
     # These two get mixed up constantly: the site grant takes the client id, the
     # Graph app-role assignment takes the object id.
     notes = [
@@ -228,8 +237,8 @@ def check_credential() -> Check:
     if scopes and not roles:
         check.hint = (
             "A delegated token proves the Graph request shapes but not the "
-            "app-only permission model. Production uses a managed identity, "
-            "which gets `roles` instead of `scp`."
+            "app-only permission model. Production uses a managed identity or "
+            "an app registration, which gets `roles` instead of `scp`."
         )
     if not roles and not scopes:
         check.status = WARN
@@ -459,6 +468,24 @@ def settings_checks() -> list[Check]:
     return checks
 
 
+def check_graph_identity() -> Check:
+    """Who Graph calls sign in as. Read from configuration; nothing is contacted.
+
+    Worth a startup line of its own because the answer is not obvious from the
+    container: it has a managed identity attached either way, and whether Graph
+    uses it or an app registration is decided by three variables.
+    """
+    from ._credential import graph_app_client_id
+
+    try:
+        client_id = graph_app_client_id()
+    except ConfigError as exc:
+        return Check("graph", FAIL, str(exc))
+    if client_id:
+        return Check("graph", PASS, f"app registration {client_id} (client secret)")
+    return Check("graph", PASS, "managed identity")
+
+
 def startup_checks() -> list[Check]:
     """Everything that can be reported without contacting anything.
 
@@ -474,6 +501,8 @@ def startup_checks() -> list[Check]:
         # Everything below reads the backend, so it would only repeat this.
         return checks
     checks.append(check_auth())
+    if not config.is_fake():
+        checks.append(check_graph_identity())
     checks.extend(settings_checks())
     return checks
 
